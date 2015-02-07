@@ -180,7 +180,7 @@
                                (cond
                                  ;; if there is a complement of 'f'
                                  ;; stop processing, return -top
-                                 [(contradictory? f f*)
+                                 [(complementary? f f*)
                                   (values #t (λ () -top))]
                                  ;; if 'f' implies something in 'result'
                                  ;; continue in case there is a complement
