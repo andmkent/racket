@@ -449,14 +449,14 @@
                                local-private-table private-method-types
                                self-type))
   (do-timestamp "built local tables")
-  (with-lexical-env/extend lexical-names/top-level lexical-types/top-level
+  (with-lexical-env/extend-types lexical-names/top-level lexical-types/top-level
     (check-super-new super-new super-inits super-init-rest))
   (do-timestamp "checked super-new")
-  (with-lexical-env/extend lexical-names/top-level lexical-types/top-level
+  (with-lexical-env/extend-types lexical-names/top-level lexical-types/top-level
     (for ([stx other-top-level-exprs])
       (tc-expr stx)))
   (do-timestamp "checked other top-level exprs")
-  (with-lexical-env/extend lexical-names/top-level lexical-types/top-level
+  (with-lexical-env/extend-types lexical-names/top-level lexical-types/top-level
     (check-field-set!s (hash-ref parse-info 'initializer-body)
                        local-field-table
                        inits))
@@ -465,19 +465,19 @@
   (define meth-stxs
     (trawl-for-property make-methods-stx tr:class:method-property))
   (define checked-method-types
-    (with-lexical-env/extend lexical-names lexical-types
+    (with-lexical-env/extend-types lexical-names lexical-types
       (check-methods (append (hash-ref parse-info 'pubment-names)
                              (hash-ref parse-info 'overridable-names))
                      internal-external-mapping meth-stxs
                      methods self-type)))
   (do-timestamp "checked methods")
   (define checked-augment-types
-    (with-lexical-env/extend lexical-names lexical-types
+    (with-lexical-env/extend-types lexical-names lexical-types
       (check-methods (hash-ref parse-info 'augment-names)
                      internal-external-mapping meth-stxs
                      augments self-type)))
   (do-timestamp "checked augments")
-  (with-lexical-env/extend lexical-names lexical-types
+  (with-lexical-env/extend-types lexical-names lexical-types
     (check-private-methods meth-stxs (hash-ref parse-info 'private-names)
                            private-method-types self-type))
   (do-timestamp "checked privates")
