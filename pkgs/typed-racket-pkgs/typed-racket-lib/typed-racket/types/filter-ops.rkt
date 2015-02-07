@@ -195,88 +195,55 @@
               [else
                (loop fs* (cons f result))])])])))
 
-
-(define (flatten-ands fs)
-  (let loop ([fs fs] [results null])
-    (match fs
-      [(list) results]
-      [(cons (AndFilter: fs*) fs) (loop fs (append fs* results))]
-      [(cons f fs) (loop fs (cons f results))])))
-
-
-(define (flatten-ors fs)
-  (let loop ([fs fs] [results null])
-    (match fs
-      [(list) results]
-      [(cons (OrFilter: fs*) fs) (loop (append fs fs*) results)]
-      [(cons f fs) (loop fs (cons f results))])))
-
-;; 3 way partition based on 2 predicates
-;; ∀ x in l1, (p1? x) = true 
-;; ∀ x in l2, (p1? x) = false ∧ (p2? x) = true 
-;; ∀ x in l3, (p1? x) = false ∧ (p2? x) = false 
-(define (tritition p1? p2? l)
-  (let loop ([l1 '()]
-             [l2 '()]
-             [l3 '()]
-             [l l])
-    (match l
-    ['() (values l1 l2 l3)]
-    [(cons f fs)
-     (cond
-       [(p1? f) (loop (cons f l1) l2 l3 fs)]
-       [(p2? f) (loop l1 (cons f l2) l3 fs)]
-       [else (loop l1 l2 (cons f l3) fs)])])))
-
 (define (-and . args)
   (define mk
     (case-lambda [() -top]
                  [(f) f]
                  [fs (make-AndFilter (sort fs filter<?))]))
+  (define (flatten-ands fs)
+    (let loop ([fs fs] [results null])
+      (match fs
+        [(list) results]
+        [(cons (AndFilter: fs*) fs) (loop fs (append fs* results))]
+        [(cons f fs) (loop fs (cons f results))])))
   ;; Move all the type filters up front as they are the stronger props
-  (define-values (type-filters not-type-filters other-args)
-    (tritition TypeFilter? 
-               NotTypeFilter? 
+  (define-values (filters other-args)
+    (partition (λ (f) (or (TypeFilter? f) (NotTypeFilter? f)))
                (flatten-ands (remove-duplicates args eq? #:key Rep-seq))))
+  (define-values (type-filters not-type-filters)
+    (partition TypeFilter? filters))
   (let loop ([fs (append type-filters not-type-filters other-args)] 
              [result null])
     (match fs
-      ['() (apply mk (compact result #f))]
+      [(list) (apply mk (compact result #f))]
       [(cons f fs*)
        (match f
-         [(Bot:) f]
+         [(and t (Bot:)) t]
          [(Top:) (loop fs* result)]
-         [_ (cond 
+         [t (cond 
               ;; check for contraditions with 'f' in the rest of 'fs'
-              [(for/or ([f* (in-list fs*)])
-                           (contradictory? f f*))
+              [(for/or ([f (in-list fs*)])
+                 (contradictory? f t))
                -bot]
               ;; check for contradictions or stronger statements 
               ;; than 'f' in 'result'
-              [(let*-values 
-                   ([(f-seq) (Rep-seq f)]
-                    [(_ res) (for/fold ([stop? #f]
-                                        [ret-thunk #f])
-                                       ([f* (in-list result)])
-                               #:break stop?
-                               (cond
-                                 ;; if there is a contradiction with f
-                                 ;; stop processing, return bottom
-                                 [(contradictory? f f*)
-                                  (values #t (λ () -bot))]
-                                 ;; if 'f' is already implied by something in 'result'
-                                 ;; continue in case there is a contradiction
-                                 ;; but save the fact that we'll not include 'f'
-                                 [(and (not ret-thunk)
-                                       (or (= (Rep-seq f*) f-seq)
-                                           (implied-atomic? f f*)))
-                                  (values #f (λ () (loop fs* result)))]
-                                 ;; no issues with 'f' yet, continue
-                                 [else (values #f ret-thunk)]))])
-                 res) => (λ (thunk) (thunk))]
+              [(let ([t-seq (Rep-seq t)])
+                 (let inner-loop ([l result]
+                                  [thunk #f])
+                   (match l
+                     [(list) thunk]
+                     [(cons f l*) 
+                      (cond
+                        [(contradictory? f t) -bot]
+                        [(and (not thunk)
+                              (or (= (Rep-seq f) t-seq)
+                                  (implied-atomic? t f)))
+                         (inner-loop l* (λ () (loop fs* result)))]
+                        [else (inner-loop l* thunk)])])))
+               => (λ (thunk) (thunk))]
               ;; 'f' must be new info (as far as we care to check),
               ;; continue w/ 'f' in the result
-              [else (loop fs* (cons f result))])])])))
+              [else (loop fs* (cons t result))])])])))
 
 ;; add-unconditional-prop: tc-results? Filter/c? -> tc-results?
 ;; Ands the given proposition to the filters in the tc-results.
