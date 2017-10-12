@@ -38,6 +38,8 @@
 (define not-given (gensym))
 
 (define (bit-vector-ref bv n [default not-given])
+  (unless (bit-vector? bv)
+    (raise-argument-error 'bit-vector-ref "bit-vector?" bv))
   (unless (exact-nonnegative-integer? n)
     (raise-argument-error 'bit-vector-ref "exact-nonnegative-integer?" n))
   (cond [(< n (bit-vector-size bv))
@@ -75,6 +77,8 @@
   (bit-vector-ref bv key))
 
 (define (bit-vector-set! bv n b)
+  (unless (bit-vector? bv)
+    (raise-argument-error 'bit-vector-set! "bit-vector?" bv))
   (define wi (word-index n))
   (define bi (bit-index n))
   (match bv
@@ -229,10 +233,6 @@
          (->* () () #:rest (listof boolean?) bit-vector?)]
  [make-bit-vector
   (->* (exact-nonnegative-integer?) (boolean?)   bit-vector?)]
- [bit-vector-ref
-  (->* (bit-vector? exact-nonnegative-integer?) (any/c) any)]
- [bit-vector-set!
-  (-> bit-vector? exact-nonnegative-integer? boolean? any)] 
  [bit-vector-length
   (-> bit-vector? any)]
  [bit-vector-popcount
@@ -249,4 +249,8 @@
  [string->bit-vector
   (-> (and/c string? #rx"^[01]*$") bit-vector?)])
 
-(provide in-bit-vector for/bit-vector for*/bit-vector)
+(provide in-bit-vector for/bit-vector for*/bit-vector
+         ;; provide uncontracted versions for ops
+         ;; likely to be used very frequently
+         bit-vector-ref
+         bit-vector-set!)
